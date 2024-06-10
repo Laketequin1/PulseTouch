@@ -2,6 +2,7 @@ import socket
 import ssl
 import ast
 import sqlite3
+from datetime import datetime, timedelta
 
 # Server settings
 HOST = '127.0.0.1'
@@ -60,15 +61,16 @@ def eval_message(message):
             return ast.literal_eval(message)
         except ValueError:
             warn(f'Unable to eval message recieved: "{message}"')
-    elif message:
-        warn(f"Message length is 0")
+    elif type(message) != str:
+        warn(f"Message type is not str: {type(message)}")
         return ""
     else:
-        warn(f"Message type is not str: {type(message)}")
+        warn(f"Message length is 0")
         return None
 
 # Create a socket
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 # Secure the socket with SSL
 context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -78,6 +80,23 @@ context.load_cert_chain(certfile='server_cert.pem', keyfile='server_key.pem')
 server_socket.bind((HOST, PORT))
 server_socket.listen(5)
 print(f"Server listening on {HOST}:{PORT}")
+
+try:
+    # Create table
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS WatchStatus (
+        EventID INTEGER PRIMARY KEY AUTOINCREMENT,
+        GroupID INTEGER NOT NULL,
+        WatchID INTEGER NOT NULL,
+        ActivationTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        ActivationEvent BOOLEAN NOT NULL
+    );
+    ''')
+
+    conn.commit()
+except Exception as e:
+    conn.rollback()
+    print(f"Transaction failed: {e}")
 
 while True:
     # Accept a connection
@@ -95,8 +114,33 @@ while True:
 
         print(f"Received: {data}")
 
+        try:
+            cur.execute('''
+            INSERT INTO WatchStatus (GroupID, WatchID, ActivationEvent) VALUES (?, ?, ?)
+            ''', (data["GroupID"], data["WatchID"], data["ActivationEvent"]))
+
+            conn.commit()
+
+            # Query the database
+            cur.execute('SELECT * FROM WatchStatus WHERE GroupID = ? AND NOT WatchID = ? ORDER BY ActivationTime DESC LIMIT 10', (data["GroupID"], data["WatchID"]))
+            rows = cur.fetchall()
+
+            for row in rows:
+                datetime_str = data[3]
+                datetime_obj = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
+                current_time = datetime.now()
+                two_min_ago = current_time - timedelta(minutes=2)
+                
+                if datetime_obj > two_min_ago:
+                    print("The datetime is within the past 5 minutes.")
+                else:
+                    print("The datetime is not within the past 5 minutes.")
+        except Exception as e:
+            conn.rollback()
+            print(f"Transaction failed: {e}")
+
         # Send data
-        secure_socket.sendall(b'{"WatchActive": True}')
+        secure_socket.sendall(b'{"ActivationEvent": True}')
 
     except Exception as e:
         print(f"Error: {e}")
@@ -104,4 +148,3 @@ while True:
     finally:
         # Close the connection
         secure_socket.close()
-#CREATE TABLE `teammt_PulseTouch`.`WatchStatus` ( `GroupID` INT UNSIGNED NOT NULL AUTO_INCREMENT ,  `WatchID` INT UNSIGNED NOT NULL ,  `ActivationTime` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ,  `ActivationEvent` BOOLEAN NOT NULL ,    PRIMARY KEY  (`GroupID`)) ENGINE = InnoDB;

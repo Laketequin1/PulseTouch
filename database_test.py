@@ -7,12 +7,15 @@ cur = conn.cursor()
 try:
     # Create a table
     cur.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        age INTEGER
-    )
+    CREATE TABLE `teammt_PulseTouch`.`WatchStatus` (
+        `GroupID` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        `WatchID` INT UNSIGNED NOT NULL,
+        `ActivationTime` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `ActivationEvent` BOOLEAN NOT NULL,
+        PRIMARY KEY (`GroupID`)
+    ) ENGINE = InnoDB;
     ''')
+
 
     # Insert a row of data
     cur.execute('''

@@ -55,11 +55,11 @@ def eval_message(message):
             return ast.literal_eval(message)
         except ValueError:
             warn(f'Unable to eval message recieved: "{message}"')
-    elif message:
-        warn(f"Message length is 0")
+    elif type(message) != str:
+        warn(f"Message type is not str: {type(message)}")
         return ""
     else:
-        warn(f"Message type is not str: {type(message)}")
+        warn(f"Message length is 0")
         return None
 
 # Create a socket
@@ -75,7 +75,7 @@ secure_socket.connect((HOST, PORT))
 
 try:
     # Send data
-    secure_socket.sendall(b'{"WatchID": 29542649, "WatchActive": True}')
+    secure_socket.sendall(b'{"GroupID":10, "WatchID": 2, "ActivationEvent": True}')
 
     # Receive data
     raw_data = secure_socket.recv(1024).decode('utf-8')
