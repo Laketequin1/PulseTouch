@@ -106,44 +106,48 @@ while True:
     # Wrap the socket with SSL
     secure_socket = context.wrap_socket(client_socket, server_side=True)
 
+    connected = True
+
     try:
-        # Receive data
-        raw_data = secure_socket.recv(1024).decode('utf-8')
+        while connected:
+            # Receive data
+            raw_data = secure_socket.recv(1024).decode('utf-8')
 
-        data = eval_message(raw_data)
+            data = eval_message(raw_data)
 
-        print(f"Received: {data}")
+            print(f"Received: {data}")
 
-        try:
-            cur.execute('''
-            INSERT INTO WatchStatus (GroupID, WatchID, ActivationEvent) VALUES (?, ?, ?)
-            ''', (data["GroupID"], data["WatchID"], data["ActivationEvent"]))
+            try:
+                cur.execute('''
+                INSERT INTO WatchStatus (GroupID, WatchID, ActivationEvent) VALUES (?, ?, ?)
+                ''', (data["GroupID"], data["WatchID"], data["ActivationEvent"]))
 
-            conn.commit()
+                conn.commit()
 
-            # Query the database
-            cur.execute('SELECT * FROM WatchStatus WHERE GroupID = ? AND NOT WatchID = ? ORDER BY ActivationTime DESC LIMIT 10', (data["GroupID"], data["WatchID"]))
-            rows = cur.fetchall()
+                # Query the database
+                cur.execute('''
+                            SELECT * 
+                            FROM WatchStatus 
+                            WHERE GroupID = ? 
+                            AND NOT WatchID = ? 
+                            AND ActivationTime >= datetime('now', '-2 minutes') 
+                            ORDER BY ActivationTime DESC 
+                            LIMIT 10
+                            ''', (data["GroupID"], data["WatchID"]))
+                rows = cur.fetchall()
 
-            for row in rows:
-                datetime_str = data[3]
-                datetime_obj = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
-                current_time = datetime.now()
-                two_min_ago = current_time - timedelta(minutes=2)
-                
-                if datetime_obj > two_min_ago:
-                    print("The datetime is within the past 5 minutes.")
-                else:
-                    print("The datetime is not within the past 5 minutes.")
-        except Exception as e:
-            conn.rollback()
-            print(f"Transaction failed: {e}")
+                for row in rows:
+                    print(row)
+            except Exception as e:
+                conn.rollback()
+                print(f"Transaction failed: {e}")
 
-        # Send data
-        secure_socket.sendall(b'{"ActivationEvent": True}')
+            # Send data
+            secure_socket.sendall(b'{"ActivationEvent": True}')
 
     except Exception as e:
         print(f"Error: {e}")
+        connected = False
 
     finally:
         # Close the connection

@@ -74,15 +74,17 @@ secure_socket = context.wrap_socket(client_socket, server_hostname=HOST)
 secure_socket.connect((HOST, PORT))
 
 try:
-    # Send data
-    secure_socket.sendall(b'{"GroupID":10, "WatchID": 2, "ActivationEvent": True}')
+    while True:
+        # Send data
+        watch_id = input("Enter WatchID: ")
+        secure_socket.sendall(('{"GroupID":10, "WatchID": ' + watch_id + ', "ActivationEvent": True}').encode('utf-8'))
 
-    # Receive data
-    raw_data = secure_socket.recv(1024).decode('utf-8')
+        # Receive data
+        raw_data = secure_socket.recv(1024).decode('utf-8')
 
-    data = eval_message(raw_data)
+        data = eval_message(raw_data)
 
-    print(f"Received: {data}")
+        print(f"Received: {data}")
 
 except Exception as e:
     print(f"Error: {e}")
